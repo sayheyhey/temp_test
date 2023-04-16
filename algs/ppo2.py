@@ -102,7 +102,7 @@ class PPO:
         dist = self.actor(state)
         value = self.critic(state)
         action = dist.sample()
-        print(f'action:{action}')
+        # print(f'action:{action}')
         probs = torch.squeeze(dist.log_prob(action)).item()
         if self.continuous:
             action = torch.tanh(action)

@@ -170,6 +170,10 @@ class Node:
 
     def update_cache_properties(self, content_id, seg_id, seg_size, nowTime, popularity):
         seg_id = content_id * 10 + seg_id
+        data = dict()
+        data['popularity'] = popularity
+        data['now_time'] = nowTime
+        self.buffer[seg_id]=Segment(content_id, seg_id, seg_size, data)
         self.buffer[seg_id].frequency += 1
         self.buffer[seg_id].time = nowTime
         self.buffer[seg_id].Pr = popularity
@@ -390,6 +394,8 @@ class Node:
         # print(f'state_:{state_}')
         done = obs['done']
         reward = obs['pre_reward']
+        # print(f'reward:{reward}')
+        # print(reward)
         self.step_count +=1
         self.ep_reward += reward
         agent.memory.push(state, action, probs, value, reward, done)
@@ -402,6 +408,8 @@ class Node:
                     0.9 * self.ma_rewards[-1] + 0.1 * self.ep_reward)
             else:
                 self.ma_rewards.append(self.ep_reward)
+
+            # print(f'ma_rewards{self.ma_rewards}')
 
 
 
@@ -478,7 +486,7 @@ class Node:
         # content_cache = self.cache_content_segments_set   # {1: set(1, 2, 4)]}
         # 如果做出的决定是不缓存，而自身已经缓存，则要进行删除
         if action == 0 and x_state == 1:
-            self.cache_content_segments_set.pop(obs['content_id'])
+            self.cache_content_segments_set.remove(obs['content_id'])
         # 如果做出的决定是缓存，而自己没有缓存，则进行缓存
         # 考虑还有剩余的足够空间以及当空间已经满的时候，进行替换
         elif action == 1 and x_state == 0:
@@ -494,7 +502,10 @@ class Node:
                 for seg in sorted_buffer:
                     if left_capacity >= newSeg.size:
                         break
-                    del buffer[seg.id]
+                    # print(f'seg.id{seg_id}')
+                    # print(f'buffer{buffer}')
+                    if seg.id in buffer.keys():
+                        del buffer[seg.id]
                     left_capacity += seg.size
                     del_list.append(seg)
                 buffer[newSeg.id] = newSeg
