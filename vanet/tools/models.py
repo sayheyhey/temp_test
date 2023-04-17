@@ -253,7 +253,7 @@ class Node:
         seg_features[0] = (seg_features[0] - p.SEGMENT_UNIT_SIZE_MIN) / (
                     p.SEGMENT_UNIT_SIZE_MAX - p.SEGMENT_UNIT_SIZE_MIN)
         seg_features[1] = (seg_features[1] - p.ENCODED_SEGMENTS_UNITS_MIN) / (
-                    p.ENCODED_SEGMENTS_UNITS_MAX - p.ENCODED_SEGMENTS_UNITS_MIN)
+                    p.ENCODED_SEGMENTS_UNITS_MAX )
         seg_features[2] = seg_content_cnt / p.ENCODED_SEGMENTS_UNITS_MAX
 
         return seg_features
