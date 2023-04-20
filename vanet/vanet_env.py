@@ -91,9 +91,9 @@ class Env:
                                                             cache_delegate=self.cache_delegates_list[0],
                                                             s=p.VEH_CACHE_SIZE)
                     # 初始化Vehicle缓存空间
-                    if vehicle_i in self.initial_cache_dict['Vehicle'] and self.veh_cache_enabled:
-                        for content_x, seg_x in self.initial_cache_dict['Vehicle'][vehicle_i]:
-                            self.update_cache_space_on_node(self.all_vehicle_data[v_id], content_x, seg_x, self.timer)
+                    # if vehicle_i in self.initial_cache_dict['Vehicle'] and self.veh_cache_enabled:
+                    #     for content_x, seg_x in self.initial_cache_dict['Vehicle'][vehicle_i]:
+                    #         self.update_cache_space_on_node(self.all_vehicle_data[v_id], content_x, seg_x, self.timer)
 
                 self.all_vehicle_data[v_id].update_location(vehicle_x, vehicle_y)
                 self.all_vehicle_data[v_id].refresh_in_comm_time_per_slot()
@@ -446,7 +446,7 @@ class Env:
             assert source_veh.in_comm_time_per_slot + duration <= 1, 'should <= 1'
 
             # cache delegate op
-            self.update_cache_space_on_node(self.all_vehicle_data[request.vehicle_id], request.content_id, seg,
+            self.update_cache_space_on_node(self.all_vehicle_data[request.vehicle_id], request.r_id,request.content_id, seg,
                                             self.timer + source_veh.in_comm_time_per_slot + duration)
 
         return duration
@@ -470,9 +470,10 @@ class Env:
                 self.processing_rsu_requests[target_finish_time].append(
                     m.RSU_Request(rsu_id, self.timer, target_finish_time, content_id, seg_id))
 
-    def update_cache_space_on_node(self, node, content_id, seg_id, nowTime):
+    def update_cache_space_on_node(self, node, r_id,content_id, seg_id,nowTime):
         # 提取现在的nowtime,popularity,等等信息
         obs = self.get_env_observation()
+        obs['req_id'] = r_id
         obs['nowTime'] = nowTime
         obs['popularity'] = self.varying_content_popularity_dist[self.timer][content_id]
         obs['static_popularity'] = self.content_library[content_id].popularity
@@ -480,6 +481,7 @@ class Env:
         obs['content_id'] = content_id
         obs['seg_id'] = seg_id
         obs['seg_unit'] = self.content_library[content_id].segment_units
+
 
         node.update_cache_segments(obs=obs, test_flag=self.test_flag)
 

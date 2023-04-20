@@ -15,8 +15,8 @@ from algs.baselines import LRU_Cache_Delegate, LFU_Cache_Delegate, GCP_Cache_Del
 
 parser = argparse.ArgumentParser(description='experiment setting')
 parser.add_argument('--env_id', default='test', type=str)
-parser.add_argument('--training_episode_count', default=30000, type=int)
-parser.add_argument('--drl_agent_test_interval', default=10, type=int)
+parser.add_argument('--training_episode_count', default=3000, type=int)
+parser.add_argument('--drl_agent_test_interval', default=1, type=int)
 # parser.add_argument('--iteration_count', default=600, type=int)
 parser.add_argument('--random_seed', default=1, type=int)
 parser.add_argument('--vehicle_cache_alg', default='DRL', type=str)
@@ -135,7 +135,8 @@ for episode_i in range(1, args.training_episode_count+1):
     #test drl cache algs
     if episode_i % args.drl_agent_test_interval == 0 and episode_i != 0:
         print(f'测试第{episode_i}轮模型')
-
+        with open('./Outcome/test/DRL-DRL/seed1/reward.txt','a+') as f:
+            f.write('\n'+f'test {episode_i/args.drl_agent_test_interval}'+'\n')
         # reset the environment
         env.reset(test_flag=True)
         while True:

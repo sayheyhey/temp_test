@@ -24,10 +24,9 @@ class Config:
     def __init__(self) -> None:
         ################################## 环境超参数 ###################################
         self.algo_name = "PPO"  # 算法名称
-        self.env_name = 'berlin'  # 环境名称
+        self.env_name = 'test'  # 环境名称
         self.continuous = False  # 环境是否为连续动作
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 检测GPU
-        self.seed = 10  # 随机种子，置0则不设置随机种子
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 检测GPU
         self.train_eps = 200  # 训练的回合数
         self.test_eps = 20  # 测试的回合数
         ################################################################################
@@ -158,7 +157,7 @@ class Node:
 
         # self.cache_hit_cnt_in_decision_interval = 0  # reward
         self.cache_hit_size_in_decision_interval = 0
-        self.step_count = 0
+        # self.step_count = 0
         self.ep_reward = 0
         self.reward = []
         self.ma_rewards = []
@@ -184,7 +183,7 @@ class Node:
             self.cache_hit_dict[timer][content_id] = 0
         self.cache_hit_dict[timer][content_id] += cnt
         # self.cache_hit_cnt_in_decision_interval += cnt
-        self.cache_hit_size_in_decision_interval += size_amount
+        self.cache_hit_size_in_decision_interval += cnt
 
     def increment_local_request_cnt(self, timer, content_id, cnt=1):
         if content_id not in self.local_request_cnt_dict[timer]:
@@ -372,53 +371,37 @@ class Node:
             return
         # 如果该seg没在buffer里面，表示为新的seg
         seg_data = {'now_time': obs['nowTime'], 'popularity': obs['popularity']}
+        step_count = obs['req_id']+1
         new_seg = Segment(content_id, seg_id, seg_size, seg_data)
         obs['newSeg'], obs['buffer'], obs['left_capacity'] = new_seg, self.buffer, self.left_capacity
         # 获取当前的obsation
-        obs = self.get_drl_state(obs)
-        # print(obs['state'])
-        # print(len(obs['state']))
-        # print(obs['content_id'])
-        # print(self.cache_content_segments_set)
-        # done = obs['done']
-        cfg = Config()
-        agent = PPO(298, 2, cfg)  # 创建智能体
-        state = obs['state']
-        # print(f'state:{state}')
-        action, probs, value = agent.choose_action(state)
-        # reward = self.get_reward(obs, action)
-        # print(f'reward:{reward}')
-        self.cache_decision(obs, action)
-        obs = self.get_drl_state(obs)
-        # state_ = obs['state']
-        # print(f'state_:{state_}')
-        done = obs['done']
-        reward = obs['pre_reward']
-        # print(f'reward:{reward}')
-        # print(reward)
-        self.step_count +=1
-        self.ep_reward += reward
-        agent.memory.push(state, action, probs, value, reward, done)
-        if self.step_count % cfg.update_fre == 0 :
-            agent.update()
-        if done:
-            self.reward.append(self.ep_reward)
-            if self.ma_rewards:
-                self.ma_rewards.append(
-                    0.9 * self.ma_rewards[-1] + 0.1 * self.ep_reward)
-            else:
-                self.ma_rewards.append(self.ep_reward)
+        if self.cache_delegate != 'LRU' and self.cache_delegate !='LFU':
+            obs = self.get_drl_state(obs)
+            cfg = Config()
+            state = obs['state']
 
-            # print(f'ma_rewards{self.ma_rewards}')
-
-
-
-        # print(f'state_:{state_}')
-
-        # if obs['content_id'] in self.cache_content_segments_set.keys():
-        #     x_state = 1
-        # else:
-        #     x_state = 0
+            # print(f'state:{state}')
+            state_dim = len(state)
+            agent = PPO(state_dim, 2, cfg)  # 创建智能体
+            action, probs, value = agent.choose_action(state)
+            # reward = self.get_reward(obs, action)
+            # print(f'reward:{reward}')
+            self.cache_decision(obs, action)
+            obs = self.get_drl_state(obs)
+            # state_ = obs['state']
+            # print(f'state_:{state_}')
+            done = obs['done']
+            # print(f'done:{done}')
+            reward = obs['pre_reward']
+            if test_flag:
+                with open('./Outcome/test/DRL-DRL/seed1/reward.txt', 'a+') as f:
+                    f.write(f'{reward}'+' ')
+            agent.memory.push(state, action, probs, value, reward, done)
+            if not test_flag:
+                if step_count % cfg.update_fre == 0 :
+                    agent.update()
+            self.cache_hit_size_in_decision_interval = 0
+            self.pre_decision_time = obs['nowTime']
 
         '''
         在这一步做决策：根据信息决定是否替换内容
@@ -434,46 +417,44 @@ class Node:
         5）
         6）
         '''
+        if self.cache_delegate == 'LFU' or self.cache_delegate == 'LRU':
+            replace_flag, replaced_segs = self.cache_delegate.decision(obs, test_flag)
+            if replace_flag:
+                # cache中添加新segment
+                if content_id not in self.cache_content_segments_set:
+                    self.cache_content_segments_set[content_id] = set()
+                self.cache_content_segments_set[content_id].add(seg_id)
+                self.left_capacity -= seg_size
+                # print(f'{self.type}节点{self.id}缓存了content{content_id}的segment{seg_id}')
 
-        # replace_flag, replaced_segs = self.cache_delegate.decision(obs, test_flag)
-        # if replace_flag:
-        #     # cache中添加新segment
-        #     if content_id not in self.cache_content_segments_set:
-        #         self.cache_content_segments_set[content_id] = set()
-        #     self.cache_content_segments_set[content_id].add(seg_id)
-        #     self.left_capacity -= seg_size
-        #     # print(f'{self.type}节点{self.id}缓存了content{content_id}的segment{seg_id}')
-        #
-        #     # 替换旧cache segments
-        #     for old_seg in replaced_segs:
-        #         old_content_id, old_seg_id = old_seg.contentId, old_seg.segmentId
-        #
-        #         assert old_content_id in self.cache_content_segments_set, f'replace nonexistent content {old_content_id} on vehicle {self.id}'
-        #         assert old_seg_id in self.cache_content_segments_set[
-        #             old_content_id], f'replace nonexistent segment {old_seg_id} of content {old_content_id} on vehicle {self.id}'
-        #         # print(f'{self.type}节点{self.id}删除了之前缓存的content{old_content_id}的segment{old_seg_id}')
-        #
-        #         self.cache_content_segments_set[old_content_id].remove(old_seg_id)
-        #         self.left_capacity += old_seg.size
-        #
-        #         if len(self.cache_content_segments_set[old_content_id]) == 0:
-        #             del self.cache_content_segments_set[old_content_id]
-        #
-        #     # assert self.left_capacity >= 0, 'self.left_capacity < 0'
-        #
-        #     now_time = obs['nowTime']
-        #     output_str = f'时刻{now_time}处, {self.type}节点{self.id}的缓存包括: '
-        #     for c_i in list(self.cache_content_segments_set.keys()):
-        #         for segment_i in self.cache_content_segments_set[c_i]:
-        #             output_str += f'content{c_i}的segment{segment_i}  '
-        # print(output_str)
+                # 替换旧cache segments
+                for old_seg in replaced_segs:
+                    old_content_id, old_seg_id = old_seg.contentId, old_seg.segmentId
 
-        # self.debug_print()
-        # self.cache_delegate.buffer_display()
+                    assert old_content_id in self.cache_content_segments_set, f'replace nonexistent content {old_content_id} on vehicle {self.id}'
+                    assert old_seg_id in self.cache_content_segments_set[
+                        old_content_id], f'replace nonexistent segment {old_seg_id} of content {old_content_id} on vehicle {self.id}'
+                    # print(f'{self.type}节点{self.id}删除了之前缓存的content{old_content_id}的segment{old_seg_id}')
 
-        # 重置reward counter
-        self.cache_hit_size_in_decision_interval = 0
-        self.pre_decision_time = obs['nowTime']
+                    self.cache_content_segments_set[old_content_id].remove(old_seg_id)
+                    self.left_capacity += old_seg.size
+
+                    if len(self.cache_content_segments_set[old_content_id]) == 0:
+                        del self.cache_content_segments_set[old_content_id]
+
+                # assert self.left_capacity >= 0, 'self.left_capacity < 0'
+
+                now_time = obs['nowTime']
+                output_str = f'时刻{now_time}处, {self.type}节点{self.id}的缓存包括: '
+                for c_i in list(self.cache_content_segments_set.keys()):
+                    for segment_i in self.cache_content_segments_set[c_i]:
+                        output_str += f'content{c_i}的segment{segment_i}  '
+
+            # self.debug_print()
+            # self.cache_delegate.buffer_display()
+
+            #重置reward counter
+
 
     def cache_decision(self, obs, action):
         content_id = obs['content_id']
@@ -487,6 +468,7 @@ class Node:
         # 如果做出的决定是不缓存，而自身已经缓存，则要进行删除
         if action == 0 and x_state == 1:
             self.cache_content_segments_set.remove(obs['content_id'])
+            self.left_capacity += seg_size
         # 如果做出的决定是缓存，而自己没有缓存，则进行缓存
         # 考虑还有剩余的足够空间以及当空间已经满的时候，进行替换
         elif action == 1 and x_state == 0:
@@ -498,17 +480,19 @@ class Node:
             else:
                 newSeg, buffer, left_capacity = obs['newSeg'], obs['buffer'], obs['left_capacity']
                 del_list = []
-                sorted_buffer = sorted(buffer.values(), key=lambda x: x.time)
+                sorted_buffer = sorted(buffer.values(), key=lambda x: x.frequency)
                 for seg in sorted_buffer:
                     if left_capacity >= newSeg.size:
                         break
                     # print(f'seg.id{seg_id}')
                     # print(f'buffer{buffer}')
-                    if seg.id in buffer.keys():
+                    if seg.id in buffer.keys() and (self.left_capacity+seg.size)>newSeg.size:
+                        self.left_capacity +=seg.size
+                        self.left_capacity -=newSeg.size
                         del buffer[seg.id]
-                    left_capacity += seg.size
-                    del_list.append(seg)
-                buffer[newSeg.id] = newSeg
+                        del_list.append(seg)
+                        buffer[newSeg.id] = newSeg
+                        break
         obs['left_capacity'] = self.left_capacity
 
     def get_reward(self, obs, action):

@@ -25,10 +25,13 @@ class LFU_Cache_Delegate(AbstractCacheModel):
         for seg in sorted_buffer:
             if left_capacity >= newSeg.size:
                 break
-            del buffer[seg.id]
-            left_capacity += seg.size
-            del_list.append(seg)
-        buffer[newSeg.id] = newSeg
+            if seg.id in buffer.keys() and (left_capacity+seg.size)>newSeg.size:
+                left_capacity += seg.size
+                left_capacity -=newSeg.size
+                del buffer[seg.id]
+                del_list.append(seg)
+                buffer[newSeg.id] = newSeg
+                break
         replace_flag = True
         return replace_flag, del_list
 
@@ -74,14 +77,19 @@ class LRU_Cache_Delegate(AbstractCacheModel):
         newSeg, buffer, left_capacity = obs['newSeg'], obs['buffer'], obs['left_capacity']
         del_list = []
         sorted_buffer = sorted(buffer.values(), key=lambda x: x.time)
+
         for seg in sorted_buffer:
             if left_capacity >= newSeg.size:
                 break
-            del buffer[seg.id]
-            left_capacity += seg.size
-            del_list.append(seg)
-        buffer[newSeg.id] = newSeg
-        return True, del_list
+            if seg.id in buffer.keys() and (left_capacity + seg.size) > newSeg.size:
+                left_capacity += seg.size
+                left_capacity -= newSeg.size
+                del buffer[seg.id]
+                del_list.append(seg)
+                buffer[newSeg.id] = newSeg
+                break
+        replace_flag = True
+        return replace_flag, del_list
 
 
 class RC_Cache_Delegate(AbstractCacheModel):

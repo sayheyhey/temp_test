@@ -25,10 +25,16 @@ class PPOMemory:
         self.dones = []
         self.batch_size = batch_size
     def sample(self):
+        # 假设(0,20,5)
+        # batch_step = [0,5,10,15]
         batch_step = np.arange(0, len(self.states), self.batch_size)
         indices = np.arange(len(self.states), dtype=np.int64)
-        np.random.shuffle(indices)
+        np.random.shuffle(indices) #[0,8,12,11,6,...,19]
         batches = [indices[i:i+self.batch_size] for i in batch_step]
+        # batches =[[0,8,12,11,6],
+        #           [...]
+        #           [...]
+        #           [..,19]
         return np.array(self.states),np.array(self.actions),np.array(self.probs),\
                 np.array(self.vals),np.array(self.rewards),np.array(self.dones),batches
                 
