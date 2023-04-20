@@ -375,7 +375,7 @@ class Node:
         new_seg = Segment(content_id, seg_id, seg_size, seg_data)
         obs['newSeg'], obs['buffer'], obs['left_capacity'] = new_seg, self.buffer, self.left_capacity
         # 获取当前的obsation
-        if self.cache_delegate != 'LRU' and self.cache_delegate !='LFU':
+        if self.cache_delegate.alg_name != 'LRU' and self.cache_delegate.alg_name !='LFU':
             obs = self.get_drl_state(obs)
             cfg = Config()
             state = obs['state']
@@ -417,38 +417,39 @@ class Node:
         5）
         6）
         '''
-        if self.cache_delegate == 'LFU' or self.cache_delegate == 'LRU':
-            replace_flag, replaced_segs = self.cache_delegate.decision(obs, test_flag)
-            if replace_flag:
-                # cache中添加新segment
-                if content_id not in self.cache_content_segments_set:
-                    self.cache_content_segments_set[content_id] = set()
-                self.cache_content_segments_set[content_id].add(seg_id)
-                self.left_capacity -= seg_size
-                # print(f'{self.type}节点{self.id}缓存了content{content_id}的segment{seg_id}')
-
-                # 替换旧cache segments
-                for old_seg in replaced_segs:
-                    old_content_id, old_seg_id = old_seg.contentId, old_seg.segmentId
-
-                    assert old_content_id in self.cache_content_segments_set, f'replace nonexistent content {old_content_id} on vehicle {self.id}'
-                    assert old_seg_id in self.cache_content_segments_set[
-                        old_content_id], f'replace nonexistent segment {old_seg_id} of content {old_content_id} on vehicle {self.id}'
-                    # print(f'{self.type}节点{self.id}删除了之前缓存的content{old_content_id}的segment{old_seg_id}')
-
-                    self.cache_content_segments_set[old_content_id].remove(old_seg_id)
-                    self.left_capacity += old_seg.size
-
-                    if len(self.cache_content_segments_set[old_content_id]) == 0:
-                        del self.cache_content_segments_set[old_content_id]
-
-                # assert self.left_capacity >= 0, 'self.left_capacity < 0'
-
-                now_time = obs['nowTime']
-                output_str = f'时刻{now_time}处, {self.type}节点{self.id}的缓存包括: '
-                for c_i in list(self.cache_content_segments_set.keys()):
-                    for segment_i in self.cache_content_segments_set[c_i]:
-                        output_str += f'content{c_i}的segment{segment_i}  '
+        # if self.cache_delegate.alg_name == 'LFU' or self.cache_delegate.alg_name == 'LRU':
+        #     replace_flag, replaced_segs = self.cache_delegate.decision(obs, test_flag)
+        #     if replace_flag:
+        #
+        #         # 替换旧cache segments
+        #         for old_seg in replaced_segs:
+        #             old_content_id, old_seg_id = old_seg.contentId, old_seg.segmentId
+        #             #
+        #             # assert old_content_id in self.cache_content_segments_set, f'replace nonexistent content {old_content_id} on vehicle {self.id}'
+        #             # assert old_seg_id in self.cache_content_segments_set[
+        #             #     old_content_id], f'replace nonexistent segment {old_seg_id} of content {old_content_id} on vehicle {self.id}'
+        #             # # print(f'{self.type}节点{self.id}删除了之前缓存的content{old_content_id}的segment{old_seg_id}')
+        #
+        #             del self.cache_content_segments_set[old_content_id]
+        #             self.left_capacity += old_seg.size
+        #
+        #             # if len(self.cache_content_segments_set[old_content_id]) == 0:
+        #             #     del self.cache_content_segments_set[old_content_id]
+        #         # cache中添加新segment
+        #         if content_id not in self.cache_content_segments_set and self.left_capacity > seg_size:
+        #             self.cache_content_segments_set[content_id] = set()
+        #             self.cache_content_segments_set[content_id].add(seg_id)
+        #             self.left_capacity -= seg_size
+        #         # print(f'{self.type}节点{self.id}缓存了content{content_id}的segment{seg_id}')
+        #
+        #
+        #         assert self.left_capacity >= 0, 'self.left_capacity < 0'
+        #
+        #         now_time = obs['nowTime']
+        #         output_str = f'时刻{now_time}处, {self.type}节点{self.id}的缓存包括: '
+        #         for c_i in list(self.cache_content_segments_set.keys()):
+        #             for segment_i in self.cache_content_segments_set[c_i]:
+        #                 output_str += f'content{c_i}的segment{segment_i}  '
 
             # self.debug_print()
             # self.cache_delegate.buffer_display()
