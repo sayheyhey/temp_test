@@ -27,8 +27,6 @@ class Config:
         self.env_name = 'test'  # 环境名称
         self.continuous = False  # 环境是否为连续动作
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 检测GPU
-        self.train_eps = 200  # 训练的回合数
-        self.test_eps = 20  # 测试的回合数
         ################################################################################
 
         ################################## 算法超参数 ####################################
@@ -163,10 +161,10 @@ class Node:
         self.ma_rewards = []
 
     def debug_print(self):
-        with open('model_buffer.txt', 'a') as f:
-            print(self.cache_content_segments_set, file=f)
-        f.close()
-
+        # with open('model_buffer.txt', 'a') as f:
+        #     print(self.cache_content_segments_set, file=f)
+        # f.close()
+        pass
     def update_cache_properties(self, content_id, seg_id, seg_size, nowTime, popularity):
         seg_id = content_id * 10 + seg_id
         data = dict()
@@ -417,39 +415,39 @@ class Node:
         5）
         6）
         '''
-        # if self.cache_delegate.alg_name == 'LFU' or self.cache_delegate.alg_name == 'LRU':
-        #     replace_flag, replaced_segs = self.cache_delegate.decision(obs, test_flag)
-        #     if replace_flag:
-        #
-        #         # 替换旧cache segments
-        #         for old_seg in replaced_segs:
-        #             old_content_id, old_seg_id = old_seg.contentId, old_seg.segmentId
-        #             #
-        #             # assert old_content_id in self.cache_content_segments_set, f'replace nonexistent content {old_content_id} on vehicle {self.id}'
-        #             # assert old_seg_id in self.cache_content_segments_set[
-        #             #     old_content_id], f'replace nonexistent segment {old_seg_id} of content {old_content_id} on vehicle {self.id}'
-        #             # # print(f'{self.type}节点{self.id}删除了之前缓存的content{old_content_id}的segment{old_seg_id}')
-        #
-        #             del self.cache_content_segments_set[old_content_id]
-        #             self.left_capacity += old_seg.size
-        #
-        #             # if len(self.cache_content_segments_set[old_content_id]) == 0:
-        #             #     del self.cache_content_segments_set[old_content_id]
-        #         # cache中添加新segment
-        #         if content_id not in self.cache_content_segments_set and self.left_capacity > seg_size:
-        #             self.cache_content_segments_set[content_id] = set()
-        #             self.cache_content_segments_set[content_id].add(seg_id)
-        #             self.left_capacity -= seg_size
-        #         # print(f'{self.type}节点{self.id}缓存了content{content_id}的segment{seg_id}')
-        #
-        #
-        #         assert self.left_capacity >= 0, 'self.left_capacity < 0'
-        #
-        #         now_time = obs['nowTime']
-        #         output_str = f'时刻{now_time}处, {self.type}节点{self.id}的缓存包括: '
-        #         for c_i in list(self.cache_content_segments_set.keys()):
-        #             for segment_i in self.cache_content_segments_set[c_i]:
-        #                 output_str += f'content{c_i}的segment{segment_i}  '
+        if self.cache_delegate.alg_name == 'LFU' or self.cache_delegate.alg_name == 'LRU':
+            replace_flag, replaced_segs = self.cache_delegate.decision(obs, test_flag)
+            if replace_flag:
+
+                # 替换旧cache segments
+                for old_seg in replaced_segs:
+                    old_content_id, old_seg_id = old_seg.contentId, old_seg.segmentId
+                    #
+                    # assert old_content_id in self.cache_content_segments_set, f'replace nonexistent content {old_content_id} on vehicle {self.id}'
+                    # assert old_seg_id in self.cache_content_segments_set[
+                    #     old_content_id], f'replace nonexistent segment {old_seg_id} of content {old_content_id} on vehicle {self.id}'
+                    # # print(f'{self.type}节点{self.id}删除了之前缓存的content{old_content_id}的segment{old_seg_id}')
+                    if old_content_id in self.cache_content_segments_set.keys():
+                        del self.cache_content_segments_set[old_content_id]
+                        self.left_capacity += old_seg.size
+
+                    # if len(self.cache_content_segments_set[old_content_id]) == 0:
+                    #     del self.cache_content_segments_set[old_content_id]
+                # cache中添加新segment
+                if content_id not in self.cache_content_segments_set and self.left_capacity > seg_size:
+                    self.cache_content_segments_set[content_id] = set()
+                    self.cache_content_segments_set[content_id].add(seg_id)
+                    self.left_capacity -= seg_size
+                # print(f'{self.type}节点{self.id}缓存了content{content_id}的segment{seg_id}')
+
+
+                assert self.left_capacity >= 0, 'self.left_capacity < 0'
+
+                now_time = obs['nowTime']
+                output_str = f'时刻{now_time}处, {self.type}节点{self.id}的缓存包括: '
+                for c_i in list(self.cache_content_segments_set.keys()):
+                    for segment_i in self.cache_content_segments_set[c_i]:
+                        output_str += f'content{c_i}的segment{segment_i}  '
 
             # self.debug_print()
             # self.cache_delegate.buffer_display()
@@ -468,7 +466,7 @@ class Node:
         # content_cache = self.cache_content_segments_set   # {1: set(1, 2, 4)]}
         # 如果做出的决定是不缓存，而自身已经缓存，则要进行删除
         if action == 0 and x_state == 1:
-            self.cache_content_segments_set.remove(obs['content_id'])
+            del self.cache_content_segments_set[content_id]
             self.left_capacity += seg_size
         # 如果做出的决定是缓存，而自己没有缓存，则进行缓存
         # 考虑还有剩余的足够空间以及当空间已经满的时候，进行替换
@@ -487,9 +485,12 @@ class Node:
                         break
                     # print(f'seg.id{seg_id}')
                     # print(f'buffer{buffer}')
+                    # 进行替换操作
                     if seg.id in buffer.keys() and (self.left_capacity+seg.size)>newSeg.size:
                         self.left_capacity +=seg.size
                         self.left_capacity -=newSeg.size
+                        self.cache_content_segments_set[content_id]=set()
+                        self.cache_content_segments_set[content_id].add(newSeg.id)
                         del buffer[seg.id]
                         del_list.append(seg)
                         buffer[newSeg.id] = newSeg
