@@ -380,6 +380,7 @@ class Node:
 
             # print(f'state:{state}')
             state_dim = len(state)
+            print(state_dim)
             agent = PPO(state_dim, 2, cfg)  # 创建智能体
             action, probs, value = agent.choose_action(state)
             # reward = self.get_reward(obs, action)
