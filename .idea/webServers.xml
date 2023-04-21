@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="43528898-5e7b-40ac-8b67-f733a573f2a7" name="bishe_1">
+        <fileTransfer rootFolder="/home/lhb/git_tmp" accessType="SFTP" host="121.48.165.73" port="10996" sshConfigId="90dbd769-d074-4a4a-a58a-64449ddf3253" sshConfig="lhb@121.48.165.73:10996 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
