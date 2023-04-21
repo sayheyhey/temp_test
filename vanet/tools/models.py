@@ -384,13 +384,13 @@ class Node:
             action, probs, value = agent.choose_action(state)
             # reward = self.get_reward(obs, action)
             # print(f'reward:{reward}')
-            self.cache_decision(obs, action)
+            reward = self.cache_decision(obs, action)
             obs = self.get_drl_state(obs)
             # state_ = obs['state']
             # print(f'state_:{state_}')
             done = obs['done']
             # print(f'done:{done}')
-            reward = obs['pre_reward']
+            # reward = obs['pre_reward']
             if test_flag:
                 with open('./Outcome/test/DRL-DRL/seed1/reward.txt', 'a+') as f:
                     f.write(f'{reward}'+' ')
@@ -459,23 +459,57 @@ class Node:
         content_id = obs['content_id']
         seg_size = obs['seg_size']
         seg_id = obs['seg_id']
+        reward = 0
         if obs['content_id'] in self.cache_content_segments_set.keys():
             x_state = 1
         else:
             x_state = 0
         # content_cache = self.cache_content_segments_set   # {1: set(1, 2, 4)]}
-        # 如果做出的决定是不缓存，而自身已经缓存，则要进行删除
+        # 第一种情况：如果做出的决定是不缓存，而自身已经缓存，则要进行删除
         if action == 0 and x_state == 1:
+            # 计算到目前为止所有的缓存命中数目
+            all_hit = 0
+            for time in self.local_request_cnt_dict.keys():
+                for id in self.local_request_cnt_dict[time].keys():
+                    all_hit += self.local_request_cnt_dict[time][id]
+            # 计算该content的缓存命中数目
+            content_id_hit = 0
+            for time in self.local_request_cnt_dict.keys():
+                if content_id in self.local_request_cnt_dict[time].keys():
+                    content_id_hit += self.local_request_cnt_dict[time][content_id]
+
+            reward = -content_id_hit/all_hit
+
             del self.cache_content_segments_set[content_id]
             self.left_capacity += seg_size
-        # 如果做出的决定是缓存，而自己没有缓存，则进行缓存
-        # 考虑还有剩余的足够空间以及当空间已经满的时候，进行替换
-        elif action == 1 and x_state == 0:
+            # if all_hit:
+            #     reward = -content_id_hit/all_hit
+            # else:
+            #     reward = 0
+
+        # 第二种情况：如果做出的决定是缓存，而自己没有缓存，则进行缓存
+            # 考虑还有剩余的足够空间以及当空间已经满的时候，进行替换
+        if action == 1 and x_state == 0:
+            # 计算所有时刻的缓存命中数目
+            all_hit = 0
+            for time in self.local_request_cnt_dict.keys():
+                for id in self.local_request_cnt_dict[time].keys():
+                    all_hit += self.local_request_cnt_dict[time][id]
+            # 计算所有时刻该content的缓存命中数目
+            content_id_hit = 0
+            for time in self.local_request_cnt_dict.keys():
+                if content_id in self.local_request_cnt_dict[time].keys():
+                    content_id_hit += self.local_request_cnt_dict[time][content_id]
+
+            old_contetn_id_hit = 0
+            # 有足够空间进行缓存，不需要替换
             if self.left_capacity >= obs['seg_size']:
                 self.cache_content_segments_set[content_id] = set()
                 self.cache_content_segments_set[content_id].add(seg_id)
                 self.left_capacity -= seg_size
                 del_list = []
+
+            #  需要进行替换
             else:
                 newSeg, buffer, left_capacity = obs['newSeg'], obs['buffer'], obs['left_capacity']
                 del_list = []
@@ -485,17 +519,31 @@ class Node:
                         break
                     # print(f'seg.id{seg_id}')
                     # print(f'buffer{buffer}')
+
                     # 进行替换操作
                     if seg.id in buffer.keys() and (self.left_capacity+seg.size)>newSeg.size:
                         self.left_capacity +=seg.size
                         self.left_capacity -=newSeg.size
                         self.cache_content_segments_set[content_id]=set()
                         self.cache_content_segments_set[content_id].add(newSeg.id)
+                        for time in self.local_request_cnt_dict.keys():
+                            if seg.contentId in self.local_request_cnt_dict[time].keys():
+                                old_contetn_id_hit += self.local_request_cnt_dict[time][seg.contentId]
                         del buffer[seg.id]
                         del_list.append(seg)
                         buffer[newSeg.id] = newSeg
                         break
+            reward = (content_id_hit - old_contetn_id_hit)/all_hit
+            # if all_hit:
+            #     reward = (content_id_hit-old_contetn_id_hit)/all_hit
+            # else:
+            #     reward = 0
+
+        # 第三种情况
+        if action == x_state:
+            reward = 0
         obs['left_capacity'] = self.left_capacity
+        return reward
 
     def get_reward(self, obs, action):
         # del_list_len =len(del_list)

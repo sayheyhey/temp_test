@@ -15,7 +15,7 @@ from algs.baselines import LRU_Cache_Delegate, LFU_Cache_Delegate, GCP_Cache_Del
 
 parser = argparse.ArgumentParser(description='experiment setting')
 parser.add_argument('--env_id', default='test', type=str)
-parser.add_argument('--training_episode_count', default=20000, type=int)
+parser.add_argument('--training_episode_count', default=10000, type=int)
 parser.add_argument('--drl_agent_test_interval', default=10, type=int)
 # parser.add_argument('--iteration_count', default=600, type=int)
 parser.add_argument('--random_seed', default=1, type=int)
@@ -77,6 +77,7 @@ overall_cache_delegates_list = [vehicle_cache_delegate_list[vehicle_cache_alg_in
 env = Env(env_id=args.env_id, cache_delegates_list=overall_cache_delegates_list, rsu_cache_enabled=args.rsu_cache_enabled_flag, veh_cache_enabled=args.vehicle_cache_enabled_flag)
 
 for episode_i in range(1, args.training_episode_count+1):
+    print('=========================================================================')
     print(f'第{episode_i}轮训练')
 
     # reset the environment
@@ -134,6 +135,7 @@ for episode_i in range(1, args.training_episode_count+1):
 
     #test drl cache algs
     if episode_i % args.drl_agent_test_interval == 0 and episode_i != 0:
+        print('=========================================================================')
         print(f'测试第{episode_i}轮模型')
         with open('./Outcome/test/DRL-DRL/seed1/reward.txt','a+') as f:
             f.write('\n'+f'test {episode_i/args.drl_agent_test_interval}'+'\n')
