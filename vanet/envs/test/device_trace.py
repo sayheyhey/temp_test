@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-
+np.random.seed(1)
 
 xMin=0;xMax=100
 yMin=0;yMax=100
@@ -11,8 +11,8 @@ lambda0=20  # 用户数目的均值
 device_trace = {}
 with open('vehicle_trace.txt', 'w') as f:
     f.write('step 0' + '\n')
-    numbPoints = np.random.poisson(lambda0)  # 用户数目
-    device_num = np.random.randint(0, lambda0, numbPoints)
+    numbPoints = 10  # 用户数目
+    device_num = np.random.randint(0, 20,size=numbPoints)
     device_num.sort()
     device_num = list(set(device_num))
     xx = []

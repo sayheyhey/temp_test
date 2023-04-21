@@ -15,8 +15,8 @@ from algs.baselines import LRU_Cache_Delegate, LFU_Cache_Delegate, GCP_Cache_Del
 
 parser = argparse.ArgumentParser(description='experiment setting')
 parser.add_argument('--env_id', default='test', type=str)
-parser.add_argument('--training_episode_count', default=10000, type=int)
-parser.add_argument('--drl_agent_test_interval', default=10, type=int)
+parser.add_argument('--training_episode_count', default=30000, type=int)
+parser.add_argument('--drl_agent_test_interval', default=5, type=int)
 # parser.add_argument('--iteration_count', default=600, type=int)
 parser.add_argument('--random_seed', default=1, type=int)
 parser.add_argument('--vehicle_cache_alg', default='DRL', type=str)

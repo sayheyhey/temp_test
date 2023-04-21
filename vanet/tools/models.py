@@ -373,14 +373,14 @@ class Node:
         new_seg = Segment(content_id, seg_id, seg_size, seg_data)
         obs['newSeg'], obs['buffer'], obs['left_capacity'] = new_seg, self.buffer, self.left_capacity
         # 获取当前的obsation
-        if self.cache_delegate.alg_name != 'LRU' and self.cache_delegate.alg_name !='LFU':
+        if self.cache_delegate.alg_name != 'LRU' and self.cache_delegate.alg_name !='LFU' and self.cache_delegate.alg_name !='RC':
             obs = self.get_drl_state(obs)
             cfg = Config()
             state = obs['state']
 
             # print(f'state:{state}')
             state_dim = len(state)
-            print(state_dim)
+            # print(state_dim)
             agent = PPO(state_dim, 2, cfg)  # 创建智能体
             action, probs, value = agent.choose_action(state)
             # reward = self.get_reward(obs, action)
@@ -416,7 +416,8 @@ class Node:
         5）
         6）
         '''
-        if self.cache_delegate.alg_name == 'LFU' or self.cache_delegate.alg_name == 'LRU':
+        if self.cache_delegate.alg_name == 'LFU' or self.cache_delegate.alg_name == 'LRU' or self.cache_delegate.alg_name =='RC':
+            obs = self.get_drl_state(obs)
             replace_flag, replaced_segs = self.cache_delegate.decision(obs, test_flag)
             if replace_flag:
 

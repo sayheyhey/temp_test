@@ -22,20 +22,15 @@ class LFU_Cache_Delegate(AbstractCacheModel):
                     break
 
         sorted_buffer = sorted(buffer.values(), key=lambda x: x.frequency)
-        if left_capacity < newSeg.size:
-            for seg in sorted_buffer:
-                if left_capacity >= newSeg.size:
-                    break
-                if seg.id in buffer.keys() and (left_capacity+seg.size)>newSeg.size:
-                    left_capacity += seg.size
-                    left_capacity -=newSeg.size
-                    del buffer[seg.id]
-                    del_list.append(seg)
-                    buffer[newSeg.id] = newSeg
-                    break
-            replace_flag = True
-        else:
-            replace_flag = False
+        for seg in sorted_buffer:
+            if left_capacity >= newSeg.size:
+                break
+            if seg.id in buffer.keys():
+                del buffer[seg.id]
+                left_capacity += seg.size
+                del_list.append(seg)
+        buffer[newSeg.id] = newSeg
+        replace_flag = True
         return replace_flag, del_list
 
 
@@ -105,9 +100,10 @@ class RC_Cache_Delegate(AbstractCacheModel):
         for seg in random_buffer:
             if left_capacity >= newSeg.size:
                 break
-            del buffer[seg.id]
-            left_capacity += seg.size
-            del_list.append(seg)
+            if seg.id in buffer.keys():
+                del buffer[seg.id]
+                left_capacity += seg.size
+                del_list.append(seg)
         buffer[newSeg.id] = newSeg
         return True, del_list
 
