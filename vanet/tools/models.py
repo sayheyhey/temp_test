@@ -16,8 +16,29 @@ from algs.utils import plot_rewards
 from algs.utils import save_results, make_dir
 from algs.ppo2 import PPO
 import time
+from model_net import Actor,Critic
+import os
+import numpy as np
+import torch
+import torch.optim as optim
 
+#
 curr_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")  # 获取当前时间
+net_device = 'cuda:0'
+actor_net = Actor(148, 2, 256)
+critic_net = Critic(148, 256)
+actor_net.to(net_device)
+critic_net.to(net_device)
+states_list = []
+probs_list = []
+vals_list = []
+actions_list = []
+rewards_list = []
+dones_list = []
+actor_optimizer = optim.Adam(actor_net.parameters(), lr=0.0003)
+critic_optimizer = optim.Adam(critic_net.parameters(), lr=0.0003)
+step_count =0
+
 
 
 class Config:
@@ -26,19 +47,20 @@ class Config:
         self.algo_name = "PPO"  # 算法名称
         self.env_name = 'test'  # 环境名称
         self.continuous = False  # 环境是否为连续动作
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 检测GPU
+        # self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 检测GPU
         ################################################################################
 
         ################################## 算法超参数 ####################################
-        self.batch_size = 5  # mini-batch SGD中的批量大小
+        self.batch_size = 10  # mini-batch SGD中的批量大小
         self.gamma = 0.95  # 强化学习中的折扣因子
-        self.n_epochs = 4
+        self.n_epochs = 3
         self.actor_lr = 0.0003  # actor的学习率
         self.critic_lr = 0.0003  # critic的学习率
         self.gae_lambda = 0.95
         self.policy_clip = 0.2
-        self.hidden_dim = 512
-        self.update_fre = 20  # 策略更新频率
+        self.hidden_dim = 256
+        self.update_fre = 30  # 策略更新频率
+        self.policy_clip = 0.2
         ################################################################################
 
         ################################# 保存结果相关参数 ################################
@@ -159,6 +181,12 @@ class Node:
         self.ep_reward = 0
         self.reward = []
         self.ma_rewards = []
+        self.gamma = 0.95
+        self.gae_lambda = 0.95
+        self.policy_clip = 0.2
+        self.update_fre = 20
+        self.n_epochs = 4
+        self.batch_size = 5
 
     def debug_print(self):
         # with open('model_buffer.txt', 'a') as f:
@@ -363,26 +391,100 @@ class Node:
                        i / p.UNABLE_REQUEST_MAX for i in unable_request_cnt_list] + [
                        i / p.NEW_CONTENT_UNABLE_REQUEST_MAX for i in new_content_unable_request_cnt_list]
 
+    def choose_action(self, state):
+        state = np.array([state]) # 先转成数组再转tensor更高效
+        # print('------------------')
+        state = torch.tensor(state, dtype=torch.float).to(net_device)
+        # print(state)
+        # print(type(state))
+        dist = actor_net(state)
+        value = critic_net(state)
+        action = dist.sample()
+        # print(f'action:{action}')
+        probs = torch.squeeze(dist.log_prob(action)).item()
+        action = torch.squeeze(action).item()
+        value = torch.squeeze(value).item()
+        return action, probs, value
+    def memory_sample(self,states_list,actions_list,probs_list,vals_list,rewards_list,dones_list,batch_size):
+        batch_step = np.arange(0, len(states_list), batch_size)
+        indices = np.arange(len(states_list), dtype=np.int64)
+        np.random.shuffle(indices)  # [0,8,12,11,6,...,19]
+        batches = [indices[i:i + batch_size] for i in batch_step]
+        return np.array(states_list), np.array(actions_list), np.array(probs_list), \
+               np.array(vals_list), np.array(rewards_list), np.array(dones_list), batches
+
+    def agent_update(self,n_epochs,states_list,actions_list,probs_list,vals_list,rewards_list,dones_list,batch_size,policy_clip):
+        for _ in range(n_epochs):
+            state_arr, action_arr, old_prob_arr, vals_arr, reward_arr, dones_arr, batches = self.memory_sample(states_list,actions_list,probs_list,vals_list,rewards_list,dones_list,batch_size)
+            values = vals_arr[:]
+            ### compute advantage ###
+            advantage = np.zeros(len(reward_arr), dtype=np.float32)
+            for t in range(len(reward_arr)-1):
+                discount = 1
+                a_t = 0
+                for k in range(t, len(reward_arr)-1):
+                    a_t += discount*(reward_arr[k] + self.gamma*values[k+1]*\
+                            (1-int(dones_arr[k])) - values[k])
+                    discount *= self.gamma*self.gae_lambda
+                advantage[t] = a_t
+            advantage = torch.tensor(advantage).to(net_device)
+            ### SGD ###
+            values = torch.tensor(values).to(net_device)
+            for batch in batches:
+                states = torch.tensor(state_arr[batch], dtype=torch.float).to(net_device)
+                old_probs = torch.tensor(old_prob_arr[batch]).to(net_device)
+                actions = torch.tensor(action_arr[batch]).to(net_device)
+                dist = actor_net(states)
+                critic_value = critic_net(states)
+                critic_value = torch.squeeze(critic_value)
+                new_probs = dist.log_prob(actions)
+                prob_ratio = new_probs.exp() / old_probs.exp()
+                weighted_probs = advantage[batch] * prob_ratio
+                weighted_clipped_probs = torch.clamp(prob_ratio, 1 - policy_clip,
+                                                     1 + policy_clip) * advantage[batch]
+                actor_loss = -torch.min(weighted_probs, weighted_clipped_probs).mean()
+
+                returns = advantage[batch] + values[batch]
+                critic_loss = (returns - critic_value) ** 2
+                critic_loss = critic_loss.mean()
+                total_loss = actor_loss + 0.5 * critic_loss
+                with open('./Loss/all_loss.txt','a+') as f:
+                    f.write(f'{total_loss}'+' ')
+                with open('./Loss/actor_loss.txt','a+') as f:
+                    f.write(f'{actor_loss}'+' ')
+                with open('./Loss/critic_loss.txt', 'a+') as f:
+                    f.write(f'{critic_loss}' + ' ')
+                actor_optimizer.zero_grad()
+                critic_optimizer.zero_grad()
+                total_loss.backward()
+                actor_optimizer.step()
+                critic_optimizer.step()
+
     def update_cache_segments(self, obs, test_flag):
         content_id, seg_id, seg_size = obs['content_id'], obs['seg_id'], obs['seg_size']
         if content_id * 10 + seg_id in self.buffer:
             return
         # 如果该seg没在buffer里面，表示为新的seg
         seg_data = {'now_time': obs['nowTime'], 'popularity': obs['popularity']}
-        step_count = obs['req_id']+1
+        # step_count = obs['req_id']+1
         new_seg = Segment(content_id, seg_id, seg_size, seg_data)
         obs['newSeg'], obs['buffer'], obs['left_capacity'] = new_seg, self.buffer, self.left_capacity
+        obs_done = obs['done']
         # 获取当前的obsation
         if self.cache_delegate.alg_name != 'LRU' and self.cache_delegate.alg_name !='LFU' and self.cache_delegate.alg_name !='RC':
+            global step_count
+            if not test_flag:
+                step_count += 1
             obs = self.get_drl_state(obs)
             cfg = Config()
             state = obs['state']
 
+
             # print(f'state:{state}')
             state_dim = len(state)
             # print(state_dim)
-            agent = PPO(state_dim, 2, cfg)  # 创建智能体
-            action, probs, value = agent.choose_action(state)
+            # agent = PPO(state_dim, 2, cfg)  # 创建智能体
+            action, probs, value = self.choose_action(state)
             # reward = self.get_reward(obs, action)
             # print(f'reward:{reward}')
             reward = self.cache_decision(obs, action)
@@ -392,13 +494,33 @@ class Node:
             done = obs['done']
             # print(f'done:{done}')
             # reward = obs['pre_reward']
+            states_list.append(state)
+            actions_list.append(action)
+            vals_list.append(value)
+            rewards_list.append(reward)
+            dones_list.append(done)
+            probs_list.append(probs)
             if test_flag:
-                with open('./Outcome/test/DRL-DRL/seed1/reward.txt', 'a+') as f:
+                with open('./Outcome/test/DRL-DRL/seed3/reward.txt', 'a+') as f:
                     f.write(f'{reward}'+' ')
-            agent.memory.push(state, action, probs, value, reward, done)
+                step_count = 0
+                states_list.clear()
+                probs_list.clear()
+                vals_list.clear()
+                actions_list.clear()
+                rewards_list.clear()
+                dones_list.clear()
             if not test_flag:
-                if step_count % cfg.update_fre == 0 :
-                    agent.update()
+                if step_count % self.update_fre == 0 :
+                    # print(step_count)
+                    self.agent_update(self.n_epochs,states_list,actions_list,probs_list,vals_list,rewards_list,dones_list,self.batch_size,self.policy_clip)
+                    states_list.clear()
+                    probs_list.clear()
+                    vals_list.clear()
+                    actions_list.clear()
+                    rewards_list.clear()
+                    dones_list.clear()
+            # print(step_count)
             self.cache_hit_size_in_decision_interval = 0
             self.pre_decision_time = obs['nowTime']
 

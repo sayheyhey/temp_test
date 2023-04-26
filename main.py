@@ -10,15 +10,16 @@ from vanet.vanet_env import Env
 from Pathfinder import my_mkdir
 from algs.drl_agent import DRL_Cache_Delegate
 from algs.baselines import LRU_Cache_Delegate, LFU_Cache_Delegate, GCP_Cache_Delegate, RC_Cache_Delegate
+
 # from algs.baselines import LRU_Cache_Delegate, LFU_Cache_Delegate, GCP_Cache_Delegate, RC_Cache_Delegate, GDSF_Cache_Delegate
 
 
 parser = argparse.ArgumentParser(description='experiment setting')
 parser.add_argument('--env_id', default='test', type=str)
-parser.add_argument('--training_episode_count', default=30000, type=int)
-parser.add_argument('--drl_agent_test_interval', default=5, type=int)
+parser.add_argument('--training_episode_count', default=10000, type=int)
+parser.add_argument('--drl_agent_test_interval', default=1, type=int)
 # parser.add_argument('--iteration_count', default=600, type=int)
-parser.add_argument('--random_seed', default=1, type=int)
+parser.add_argument('--random_seed', default=3, type=int)
 parser.add_argument('--vehicle_cache_alg', default='DRL', type=str)
 parser.add_argument('--rsu_cache_alg', default='DRL', type=str)
 parser.add_argument('--rsu_cache_enabled_flag', default=False, type=bool)
@@ -76,9 +77,20 @@ overall_cache_delegates_list = [vehicle_cache_delegate_list[vehicle_cache_alg_in
 # initialize the environment
 env = Env(env_id=args.env_id, cache_delegates_list=overall_cache_delegates_list, rsu_cache_enabled=args.rsu_cache_enabled_flag, veh_cache_enabled=args.vehicle_cache_enabled_flag)
 
+# 建立模型
+
+
 for episode_i in range(1, args.training_episode_count+1):
     print('=========================================================================')
     print(f'第{episode_i}轮训练')
+    if episode_i%args.drl_agent_test_interval==0:
+        with open('./Loss/all_loss.txt','a+') as f:
+            f.write('\n'+f'all_loss {episode_i/args.drl_agent_test_interval}'+'\n')
+        with open('./Loss/actor_loss.txt','a+') as f:
+            f.write('\n'+f'actor_loss {episode_i/args.drl_agent_test_interval}'+'\n')
+        with open('./Loss/critic_loss.txt','a+') as f:
+            f.write('\n'+f'critic_loss {episode_i/args.drl_agent_test_interval}'+'\n')
+
 
     # reset the environment
     env.reset()
@@ -130,14 +142,14 @@ for episode_i in range(1, args.training_episode_count+1):
                 file.write(f'{p.CACHE_ALGS[vehicle_cache_alg_index]}-{p.CACHE_ALGS[rsu_cache_alg_index]}:{res_succ_request_ratio} {res_cache_hit_ratio} {res_avg_response_time}\n')
         break
 
-    for delegate in overall_cache_delegates_list:
-        delegate.save(i_episode=episode_i)
+    # for delegate in overall_cache_delegates_list:
+    #     delegate.save(i_episode=episode_i)
 
-    #test drl cache algs
+    # # test drl cache algs
     if episode_i % args.drl_agent_test_interval == 0 and episode_i != 0:
         print('=========================================================================')
         print(f'测试第{episode_i}轮模型')
-        with open('./Outcome/test/DRL-DRL/seed1/reward.txt','a+') as f:
+        with open('./Outcome/test/DRL-DRL/seed3/reward.txt','a+') as f:
             f.write('\n'+f'test {episode_i/args.drl_agent_test_interval}'+'\n')
         # reset the environment
         env.reset(test_flag=True)

@@ -23,7 +23,6 @@ class Config:
         self.env_name = 'CartPole-v1' # 环境名称
         self.continuous = False # 环境是否为连续动作
         self.device = torch.device("cuda：1" if torch.cuda.is_available() else "cpu")  # 检测GPU
-        self.seed = 10 # 随机种子，置0则不设置随机种子
         self.train_eps = 200 # 训练的回合数
         self.test_eps = 20 # 测试的回合数
         ################################################################################

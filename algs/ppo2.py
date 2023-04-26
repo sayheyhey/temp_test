@@ -152,6 +152,8 @@ class PPO:
                 critic_loss = (returns-critic_value)**2
                 critic_loss = critic_loss.mean()
                 total_loss = actor_loss + 0.5*critic_loss
+                with open('./loss.txt','a+') as f:
+                    f.write(f'{total_loss}'+' ')
 
                 self.loss  = total_loss
                 self.actor_optimizer.zero_grad()

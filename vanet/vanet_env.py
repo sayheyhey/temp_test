@@ -330,7 +330,7 @@ class Env:
                     if not v_j.in_comm_flag and v_j.in_comm_time_per_slot <= source_vehicle.in_comm_time_per_slot and request.content_id in v_j.cache_content_segments_set and v_j.cur_request_cnt <= 0:
                         assert v_j.cur_request_cnt == 0, 'v_j.cur_request_cnt < 0'
                         for seg in v_j.cache_content_segments_set[request.content_id]:
-                            if len(request.left_segment_list)<(seg+2):
+                            if len(request.left_segment_list)>seg and seg > -1:
                                 if request.left_segment_list[seg] > 0 and not process_flag:
                                     process_flag = True
                                     target_node, target_seg = v_j, seg
